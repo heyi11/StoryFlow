@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+  <title>Title</title>
+</head>
+<body>
+
+<canvas width="2000" height="1000" id="myCanvas">
+</canvas>
+
+</body>
+</html>
+<script>
+  console.log("hi1")
+   d3.json("star_wars.json", function(error, data) {
+	    	if(error) throw error;
+	    	graph = data;
+	    	console.log(graph);
+	    });
+</script>
