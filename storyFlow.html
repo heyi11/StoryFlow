@@ -8,7 +8,7 @@
 </head>
 <body>
 	<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
-	<svg width="100" height="10">
+	<svg width="10" height="100">
 
 </svg>
 
@@ -17,6 +17,46 @@
 </body>
 </html>
 <script>
+
+	 var options = {
+        svg: {
+            element: "#canvas",
+            height: 1000,
+            width: 16000,
+            topPadding: 60
+        },
+        animation: {
+            transitionDuration: 1000
+        },
+        characters: {
+            interpolation: "monotone",
+            class: "line",
+            labelClass: "name",
+            labelX: 4,
+            labelDy: -4,
+            sessionCoefficient: 2,
+            strokeWidth: 4,
+            highlightStrokeWidth: 8,
+            highlightDuration: 400,
+            nonHighlightedOpacity: 0.2,
+            toKeep: null
+        },
+        locations: {
+            interpolation: "monotone",
+            fontSize: "30px",
+            labelX: 30,
+            labelDy: -10,
+            padding: 20,
+            opacity: 0.2,
+            class: "locationPath",
+            labelClass: "locationLabel",
+            splitLength: 400
+        },
+        algorithm: {
+            sweepingMaxIterations: 3
+        }
+    };
+ 
 	var star_wars = {
   "name": "Star Wars",
   "characters": [
@@ -1032,140 +1072,674 @@
 
 	var _svg = d3.select("body")
                  .append("svg")
-                 .attr("width","400")
-                 .attr("height","300");
+                 .attr("width","10000")
+                 .attr("height","700");
+	
+	var timeframe = star_wars.sessions.map(function (x) {
+            return {start: x.start, end: x.end}
+        })
+//	.reduce(function (x, y) {
+//                    return {start: Math.min(x.start, y.start), end: Math.max(x.end, y.end)}
+//                });
+	console.log(timeframe)
+	console.log(star_wars.characters)
+
+	var characterColors = star_wars.characters.length <= 10 ? d3.scale.category10() : d3.scale.category20();
+    var locationColors  = star_wars.locations.length <= 10 ? d3.scale.category10() : d3.scale.category20();
+	console.log(characterColors)
+	
+	for (i = 0; i < star_wars.characters.length; ++i) {
+            star_wars.characters[i].d3 = {color: characterColors(i)};
+        }
+	 // Assign each location a color
+        for (i = 0; i < star_wars.locations.length; ++i) {
+            star_wars.locations[i].d3 = {color: locationColors(i)};
+        }
+
+        // Compute the maximum number of characters in a time unit
+        // (Useful for scaling the layout)
+	 var maxCharacters = star_wars.sessions.map(function (sessions) {
+            return sessions.members.length;
+        })
+//                .reduce(function (x, y) {
+//                    return Math.max(x, y);
+//                });
+	console.log(maxCharacters)
+
+	 var verticalScale = d3.scale.linear()
+                .domain([0, maxCharacters])
+                .range([options.svg.topPadding, options.svg.height]);
+
+        var horizontalScale = d3.scale.linear()
+                .domain([0, star_wars.sessions.length])
+                .range([0, options.svg.width]);
+	
+	 // Compute the path of each character
+//        for (var t = 0; t < star_wars.sessions.length; ++t) {
+//            var time = star_wars.sessions[t];
+
+            // Since we use the characters in time.sortedCharacter, we need a way of knowing
+            // how they are grouped together (in sessions)
+            // characterGroups stores the number of sessions and how many characters it contains
+            var characterGroups =  star_wars.sessions.map(function (x) {
+                        
+                            return x.members.length;
+                       
+                    })
+			
+
+            var offset = 0;
+	
+//			characterGroups.forEach(function (charactersInSession) {
+//                var mean = 0;
+//
+//                for (i = 0; i < charactersInSession; ++i) {
+//                    mean += verticalScale(offset + i+1);
+//                }
+//
+//                mean /= charactersInSession;
+//
+//                for (i = 0; i < charactersInSession; ++i) {
+//                    // Fetch the character with the given ID
+//                    var character = star_wars.characters.filter(function (character) {
+//                        return character.id == star_wars.sessions.members[offset + i];
+//                    });
+//
+//                    if (character.isRemoved)
+//                        continue;
+//
+//                    if (character.d3.points == undefined)
+//                        character.d3.points = [];
+//
+//                    // Distribute it around the mean according to its position in the session
+//                    character.d3.points.push({
+//                        x: horizontalScale(t),
+//                        y: mean + ((verticalScale(offset + i) - mean) / options.characters.sessionCoefficient)
+//                    });
+//                }
+//
+//                // Keep track of the index in time.sortedCharacters
+//                offset += charactersInSession;
+//            });
+	dataset = star_wars;
+//        var svg = d3.select(options.svg.element).append("svg").attr("height", options.svg.height).attr("width", options.svg.width);
+//		var line_function = d3.svg.line().interpolate(options.characters.interpolation)
+//                .x(function (d) {
+//                    return d.x;
+//                })
+//                .y(function (d) {
+//                    return d.y;
+//                });
+//	for (var t = 0; t < dataset.d3.time.length; ++t) {
+//            var time = dataset.d3.time[t];
+//
+//            for (i = 0; i < time.locations.length; ++i) {
+//                var sessions = time.locations[i].sessions;
+//
+//                for (k = 0; k < sessions.length; ++k) {
+//                    var session   = dataset.sessions[sessions[k]];
+//                    var location   = dataset.locations[session.location];
+//
+//                    for (var h = 0; h < session.members.length; ++h) {
+//                        var character   = dataset.characters.filter(function (character) {
+//                            return character.id == session.members[h];
+//                        });
+//
+//                        if (location.d3.points == undefined)
+//                            location.d3.points = [];
+//
+//                        character.d3.points.forEach(function(characterPoint) {
+//                            // We are only interested in the points belonging to this 'time'
+//                            if (characterPoint.x != horizontalScale(t))
+//                                return;
+//
+//                            // No points added -> nothing to check
+//                            if (location.d3.points.length == 0)
+//                                location.d3.points.push({
+//                                    top: characterPoint,
+//                                    bottom: characterPoint
+//                                });
+//                            else {
+//                                var lastPoint = location.d3.points[location.d3.points.length - 1];
+//
+//                                // If the last points is from this 'time'
+//                                if (lastPoint.top.x == characterPoint.x) {
+//                                    // If the new point is 'higher' (lower Y), replace the top one
+//                                    if (lastPoint.top.y > characterPoint.y) {
+//                                        location.d3.points[location.d3.points.length - 1].top = characterPoint;
+//                                    } else if (lastPoint.bottom.y < characterPoint.y) {
+//                                        // If the new points is 'lower' (higher Y), replace the bottom one
+//                                        location.d3.points[location.d3.points.length - 1].bottom = characterPoint;
+//                                    }
+//                                } else {
+//                                    // First point of belonging to this 'time' -> nothing to check
+//                                    location.d3.points.push({
+//                                        top: characterPoint,
+//                                        bottom: characterPoint
+//                                    });
+//                                }
+//                            }
+//                        });
+//                    }
+//                }
+//            }
+//        }
+	var line = d3.svg.line()
+	    		 .x(function(d) { return d[1]; })
+    			 .y(function(d) { return d[2];})
+				
+				 .interpolate("linear");
+
+
+	
+    var arr =[]
+	n = 0;
+	for(var i = 0;i < star_wars.sessions.length; i++){
+		
+		for(var j=0;j<star_wars.sessions[i].members.length;j++)
+		{
+		if(star_wars.sessions[i].members[j]==0)
+		   {
+		      arr[n] = [i,star_wars.sessions[i].start+1,((star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4)]
+			   n = n+1
+			   arr[n] = [i,star_wars.sessions[i].end,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n = n+1
+		   }
+		}
+		 }
+	var arr1 =[]
+	n1 = 0;
+	for(var i = 0;i < star_wars.sessions.length; i++){
+		
+		for(var j=0;j<star_wars.sessions[i].members.length;j++)
+		{
+		if(star_wars.sessions[i].members[j]==1)
+		   {
+			   
+			   
+		      arr1[n1] = [i,star_wars.sessions[i].start+1,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n1 = n1+1
+			   
+			   arr1[n1] = [i,star_wars.sessions[i].end,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n1 = n1+1
+		   }
+		}
+		 }
+	 var arr2 =[]
+	   n2 = 0;
+	for(var i = 0;i < star_wars.sessions.length; i++){
+		
+		for(var j=0;j<star_wars.sessions[i].members.length;j++)
+		{
+		if(star_wars.sessions[i].members[j]==2)
+		   {
+		      arr2[n2] = [i,star_wars.sessions[i].start+1,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n2 = n2+1
+			   arr2[n2] = [i,star_wars.sessions[i].end,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n2 = n2+1
+		   }
+		}
+		 }
+	 var arr3 =[]
+	   n3 = 0;
+	for(var i = 0;i < star_wars.sessions.length; i++){
+		
+		for(var j=0;j<star_wars.sessions[i].members.length;j++)
+		{
+		if(star_wars.sessions[i].members[j]==3)
+		   {
+		      arr3[n3] = [i,star_wars.sessions[i].start+1,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n3 = n3+1
+			   arr3[n3] = [i,star_wars.sessions[i].end,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n3 = n3+1
+		   }
+		}
+		 }
+//	console.log(arr3)
+	 var arr4 =[]
+	   n4 = 0;
+	for(var i = 0;i < star_wars.sessions.length; i++){
+		
+		for(var j=0;j<star_wars.sessions[i].members.length;j++)
+		{
+		if(star_wars.sessions[i].members[j]==4)
+		   {
+		      arr4[n4] = [i,star_wars.sessions[i].start+1,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n4 = n4+1
+			   arr4[n4] = [i,star_wars.sessions[i].end,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n4 = n4+1
+		   }
+		}
+		 }
+	 var arr5 =[]
+	   n5 = 0;
+	for(var i = 0;i < star_wars.sessions.length; i++){
+		
+		for(var j=0;j<star_wars.sessions[i].members.length;j++)
+		{
+		if(star_wars.sessions[i].members[j]==5)
+		   {
+		      arr5[n5] = [i,star_wars.sessions[i].start+1,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n5 = n5+1
+			   arr5[n5] = [i,star_wars.sessions[i].end,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n5 = n5+1
+		   }
+		}
+		 }
+	 var arr6 =[]
+	   n6 = 0;
+	for(var i = 0;i < star_wars.sessions.length; i++){
+		
+		for(var j=0;j<star_wars.sessions[i].members.length;j++)
+		{
+		if(star_wars.sessions[i].members[j]==6)
+		   {
+		      arr6[n6] = [i,star_wars.sessions[i].start+1,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n6 = n6+1
+			   arr6[n6] = [i,star_wars.sessions[i].end,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n6 = n6+1
+		   }
+		}
+		 }
+	 var arr7 =[]
+	   n7 = 0;
+	for(var i = 0;i < star_wars.sessions.length; i++){
+		
+		for(var j=0;j<star_wars.sessions[i].members.length;j++)
+		{
+		if(star_wars.sessions[i].members[j]==7)
+		   {
+		      arr7[n7] = [i,star_wars.sessions[i].start+1,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n7 = n7+1
+			   arr7[n7] = [i,star_wars.sessions[i].end,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n7 = n7+1
+		   }
+		}
+		 }
+	 var arr8 =[]
+	   n8 = 0;
+	for(var i = 0;i < star_wars.sessions.length; i++){
+		
+		for(var j=0;j<star_wars.sessions[i].members.length;j++)
+		{
+		if(star_wars.sessions[i].members[j]==8)
+		   {
+		      arr8[n8] = [i,star_wars.sessions[i].start+1,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n8 = n8+1
+			   arr8[n8] = [i,star_wars.sessions[i].end,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n8 = n8+1
+		   }
+		}
+		 }
+	 var arr9 =[]
+	   n9 = 0;
+	for(var i = 0;i < star_wars.sessions.length; i++){
+		
+		for(var j=0;j<star_wars.sessions[i].members.length;j++)
+		{
+		if(star_wars.sessions[i].members[j]==9)
+		   {
+		      arr9[n9] = [i,star_wars.sessions[i].start+1,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n9 = n9+1
+			   arr9[n9] = [i,star_wars.sessions[i].end,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n9 = n9+1
+		   }
+		}
+		 }
+	 var arr10 =[]
+	   n10 = 0;
+	for(var i = 0;i < star_wars.sessions.length; i++){
+		
+		for(var j=0;j<star_wars.sessions[i].members.length;j++)
+		{
+		if(star_wars.sessions[i].members[j]==10)
+		   {
+		      arr10[n10] = [i,star_wars.sessions[i].start+1,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n10 = n10+1
+			   arr10[n10] = [i,star_wars.sessions[i].end,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n10 = n10+1
+		   }
+		}
+		 }
+	 var arr11 =[]
+	   n11 = 0;
+	for(var i = 0;i < star_wars.sessions.length; i++){
+		
+		for(var j=0;j<star_wars.sessions[i].members.length;j++)
+		{
+		if(star_wars.sessions[i].members[j]==11)
+		   {
+		      arr11[n11] = [i,star_wars.sessions[i].start,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n11 = n11+1
+			   arr11[n11] = [i,star_wars.sessions[i].end,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n11 = n11+1
+		   }
+		}
+		 }
+	 var arr12 =[]
+	   n12 = 0;
+	for(var i = 0;i < star_wars.sessions.length; i++){
+		
+		for(var j=0;j<star_wars.sessions[i].members.length;j++)
+		{
+		if(star_wars.sessions[i].members[j]==12)
+		   {
+		      arr12[n12] = [i,star_wars.sessions[i].start+1,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n12 = n12+1
+			   arr12[n12] = [i,star_wars.sessions[i].end,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n12 = n12+1
+		   }
+		}
+		 }
+	 var arr13 =[]
+	   n13 = 0;
+	for(var i = 0;i < star_wars.sessions.length; i++){
+		
+		for(var j=0;j<star_wars.sessions[i].members.length;j++)
+		{
+		if(star_wars.sessions[i].members[j]==13)
+		   {
+		      arr13[n13] = [i,star_wars.sessions[i].start+1,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n13 = n13+1
+			   arr13[n13] = [i,star_wars.sessions[i].end,(star_wars.sessions[i].members[j]+1)*(star_wars.sessions[i].location+1)/4]
+			   n13 = n13+1
+		   }
+		}
+		 }
+	
+	arr_all = []
+	arr_all[0] = arr
+	arr_all[1] = arr1
+	arr_all[2] = arr2
+	arr_all[3] = arr3
+	arr_all[4] = arr4
+	arr_all[5] = arr5
+	arr_all[6] = arr6
+	arr_all[7] = arr7
+	arr_all[8] = arr8
+	arr_all[9] = arr9
+	arr_all[10] = arr10
+	arr_all[11] = arr11
+	arr_all[12] = arr12
+	arr_all[13] = arr13
+	console.log(arr_all)
+	console.log(arr)
+	
+	
+		
+	for (var i=0;i<14;i++)
+	{
+		for(var j=0;j<arr_all[i].length;j++)
+		{
+			
+			arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1]*5,arr_all[i][j][2]*3]
+			if(i==11){
+				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],arr_all[i][j][2]-3]
+			}
+//			if( i==4 && j>3){
+//				arr_all[4][j]= [arr_all[4][j][0],arr_all[4][j][1],arr_all[4][j][2]+10]
+//			}
+			if(arr_all[i][j][0]==15){
+				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],arr_all[i][j][2]]
+				
+			}
+			if(arr_all[i][j][0]==17){
+				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],arr_all[i][j][2]]
+				
+				
+				
+			}
+			if(arr_all[i][j][0]==25){
+				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],(arr_all[i][j][2])-4]
+				
+
+				
+			}
+			if(arr_all[i][j][0]==24){
+				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],(arr_all[i][j][2])+20]
+				
+
+				
+			}
+			if(arr_all[i][j][0]==27){
+				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],(arr_all[i][j][2])+2]
+				
+
+				
+			}
+			if(arr_all[i][j][0]==29){
+				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],(arr_all[i][j][2])-10]
+				
+
+				
+			}
+			if(arr_all[i][j][0]==36){
+				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],(arr_all[i][j][2])+5]
+				
+
+				
+			}
+			if(arr_all[i][j][0]==21){
+				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],(arr_all[i][j][2])+10]
+				
+
+				
+			}
+			if(arr_all[i][j][0]==30){
+				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],(arr_all[i][j][2])+2]
+				
+
+				
+			}
+			if(arr_all[i][j][0]==38){
+				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],(arr_all[i][j][2])-1]
+				
+
+				
+			}
+			if(arr_all[i][j][0]==40){
+				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],(arr_all[i][j][2])+5]
+				
+
+				
+			}
+						if(arr_all[i][j][0]==41){
+				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],(arr_all[i][j][2])-3]
+				
+
+				
+			}
+			if(arr_all[i][j][0]==50){
+				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],(arr_all[i][j][2])/3+15]
+				
+
+				
+			}
+			if(arr_all[i][j][0]==69){
+				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],(arr_all[i][j][2])-2]
+				
+
+				
+			}
+			if(arr_all[i][j][0]==77){
+				arr_all[5][j] = [arr_all[5][j][0],arr_all[5][j][1],(arr_all[5][j][2])+4]
+				
+
+				
+			}
+//			if(arr_all[i][j][0]==86){
+//				arr_all[5][j] = [arr_all[5][j][0],arr_all[5][j][1],(arr_all[5][j][2])+4]
+//				
+//
+//				
+//			}
+//			if(arr_all[i][j][0]==91){
+//				arr_all[5][j] = [arr_all[5][j][0],arr_all[5][j][1],(arr_all[5][j][2])+4]
+//				
+//
+//				
+//			}
+//			arr_all[5][6] =   [arr_all[5][6][0],arr_all[5][6][1],arr_all[5][5][2]]
+//			arr_all[5][7] =   [arr_all[5][7][0],arr_all[5][7][1],arr_all[5][6][2]]
+////			arr_all[6][6] =   [arr_all[6][6][0],arr_all[6][6][1],arr_all[6][7][2]]
+////			arr_all[7][5] =   [arr_all[7][5][0],arr_all[7][5][1],arr_all[7][6][2]]
+//			arr_all[1][1] =   [arr_all[1][1][0],arr_all[1][1][1],arr_all[1][2][2]]
+//			arr_all[1][3] =   [arr_all[1][3][0],arr_all[1][3][1],arr_all[1][3][2]+0.01]
+//			arr_all[2][1] =   [arr_all[2][1][0],arr_all[2][1][1],arr_all[2][2][2]]
+//			arr_all[4][0] =   [arr_all[4][0][0],arr_all[4][0][1],arr_all[4][1][2]]
+//			arr_all[3][0] =   [arr_all[3][0][0],arr_all[3][0][1],arr_all[3][1][2]]
+//			arr_all[5][0] =   [arr_all[5][0][0],arr_all[5][0][1],arr_all[5][1][2]]
+//			if(arr_all[i][j][0]==18){
+//				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],arr_all[i][j][2]+2]
+//			}
+//			if(arr_all[i][j][0]==19){
+//				arr_all[i][j] = [arr_all[i][j][0],arr_all[i][j][1],arr_all[i][j][2]+3]
+//			}
+		}
+	}
+	console.log(arr_all[0][0])
+		
 	
 	for (var i=0;i<star_wars.sessions.length;i++)
 	{
 		for(var j=0;j<star_wars.sessions[i].members.length;j++)
 		{
+			
+//			_svg.append("line")
+//                		.attr("y1",(star_wars.sessions[i].members[j])*(star_wars.sessions[i].location+1))
+//                		.attr("x1",star_wars.sessions[i].start)
+//						.attr("y2",(star_wars.sessions[i].members[j])*(star_wars.sessions[i].location+1))
+//						.attr("x2",star_wars.sessions[i].end)
+//						.style("stroke","Skyblue")
+//						.style("stroke-width","0.5");
 			switch(star_wars.sessions[i].members[j]){
 				case 0:
-					_svg.append("line")
-                		.attr("y1",star_wars.sessions[i].members[j])
-                		.attr("x1",star_wars.sessions[i].start)
-						.attr("y2",star_wars.sessions[i].members[j])
-						.attr("x2",star_wars.sessions[i].end)
-						.style("stroke","Skyblue")
-						.style("stroke-width","0.5");   
+					
+						
+
+	             
+			var d = line(arr_all[0]);
+			_svg.append("path")
+					.attr("d", d)
+					.attr("fill", "none")
+					.style("stroke","Skyblue")
+					.style("stroke-width","0.3"); 
 					break;
+					
 				case 1:
-					_svg.append("line")
-                		.attr("y1",star_wars.sessions[i].members[j])
-                		.attr("x1",star_wars.sessions[i].start)
-						.attr("y2",star_wars.sessions[i].members[j])
-						.attr("x2",star_wars.sessions[i].end)
+					var d = line(arr_all[1]);
+				_svg.append("path")
+						.attr("d", d)
+						.attr("fill", "none")
+			
 						.style("stroke","LightPink")
-						.style("stroke-width","0.5");
+						.style("stroke-width","0.3");
 					break;
 				case 2:
-					_svg.append("line")
-                		.attr("y1",star_wars.sessions[i].members[j])
-                		.attr("x1",star_wars.sessions[i].start)
-						.attr("y2",star_wars.sessions[i].members[j])
-						.attr("x2",star_wars.sessions[i].end)
+					var d = line(arr_all[2]);
+				_svg.append("path")
+						.attr("d", d)
+						.attr("fill", "none")
 						.style("stroke","Plum")
-						.style("stroke-width","0.5");
+						.style("stroke-width","0.3");
 					break;
 				case 3:
-					_svg.append("line")
-                		.attr("y1",star_wars.sessions[i].members[j])
-                		.attr("x1",star_wars.sessions[i].start)
-						.attr("y2",star_wars.sessions[i].members[j])
-						.attr("x2",star_wars.sessions[i].end)
+					var d = line(arr_all[3]);
+				_svg.append("path")
+						.attr("d", d)
+						.attr("fill", "none")
 						.style("stroke","LightSeaGreen")
-						.style("stroke-width","0.5");
+						.style("stroke-width","0.3");
 					break;
 				case 4:
-					_svg.append("line")
-                		.attr("y1",star_wars.sessions[i].members[j])
-                		.attr("x1",star_wars.sessions[i].start)
-						.attr("y2",star_wars.sessions[i].members[j])
-						.attr("x2",star_wars.sessions[i].end)
+					var d = line(arr_all[4]);
+				_svg.append("path")
+						.attr("d", d)
+						.attr("fill", "none")
 						.style("stroke","Orange")
-						.style("stroke-width","0.5");
+						.style("stroke-width","0.3");
 					break;
 				case 5:
-					_svg.append("line")
-                		.attr("y1",star_wars.sessions[i].members[j])
-                		.attr("x1",star_wars.sessions[i].start)
-						.attr("y2",star_wars.sessions[i].members[j])
-						.attr("x2",star_wars.sessions[i].end)
+					var d = line(arr_all[5]);
+				_svg.append("path")
+						.attr("d", d)
+						.attr("fill", "none")
 						.style("stroke","Gold")
-						.style("stroke-width","0.5");
+						.style("stroke-width","0.3");
 					break;
 				case 6:
-					_svg.append("line")
-                		.attr("y1",star_wars.sessions[i].members[j])
-                		.attr("x1",star_wars.sessions[i].start)
-						.attr("y2",star_wars.sessions[i].members[j])
-						.attr("x2",star_wars.sessions[i].end)
+					var d = line(arr_all[6]);
+				_svg.append("path")
+						.attr("d", d)
+						.attr("fill", "none")
 						.style("stroke","Seashell")
-						.style("stroke-width","0.5");
+						.style("stroke-width","0.3");
 					break;
 				case 7:
-					_svg.append("line")
-                		.attr("y1",star_wars.sessions[i].members[j])
-                		.attr("x1",star_wars.sessions[i].start)
-						.attr("y2",star_wars.sessions[i].members[j])
-						.attr("x2",star_wars.sessions[i].end)
+					var d = line(arr_all[7]);
+				_svg.append("path")
+						.attr("d", d)
+						.attr("fill", "none")
 						.style("stroke","Chocolate")
-						.style("stroke-width","0.5");
+						.style("stroke-width","0.3");
 					break;
 				case 8:
-					_svg.append("line")
-                		.attr("y1",star_wars.sessions[i].members[j])
-                		.attr("x1",star_wars.sessions[i].start)
-						.attr("y2",star_wars.sessions[i].members[j])
-						.attr("x2",star_wars.sessions[i].end)
+					var d = line(arr_all[8]);
+				_svg.append("path")
+						.attr("d", d)
+						.attr("fill", "none")
 						.style("stroke","Pink")
-						.style("stroke-width","0.5");
+						.style("stroke-width","0.3");
 					break;				
 				case 9:
-					_svg.append("line")
-                		.attr("y1",star_wars.sessions[i].members[j])
-                		.attr("x1",star_wars.sessions[i].start)
-						.attr("y2",star_wars.sessions[i].members[j])
-						.attr("x2",star_wars.sessions[i].end)
+					var d = line(arr_all[9]);
+				_svg.append("path")
+						.attr("d", d)
+						.attr("fill", "none")
 						.style("stroke","MistyRose")
-						.style("stroke-width","0.5");
+						.style("stroke-width","0.3");
 					break;
 				case 10:
-					_svg.append("line")
-                		.attr("y1",star_wars.sessions[i].members[j])
-                		.attr("x1",star_wars.sessions[i].start)
-						.attr("y2",star_wars.sessions[i].members[j])
-						.attr("x2",star_wars.sessions[i].end)
+					var d = line(arr_all[10]);
+				_svg.append("path")
+						.attr("d", d)
+						.attr("fill", "none")
 						.style("stroke","Maroon")
-						.style("stroke-width","0.5");
+						.style("stroke-width","0.3");
 					break;
 				case 11:
-					_svg.append("line")
-                		.attr("y1",star_wars.sessions[i].members[j])
-                		.attr("x1",star_wars.sessions[i].start)
-						.attr("y2",star_wars.sessions[i].members[j])
-						.attr("x2",star_wars.sessions[i].end)
+					var d = line(arr_all[11]);
+				_svg.append("path")
+						.attr("d", d)
+						.attr("fill", "none")
 						.style("stroke","Tan")
-						.style("stroke-width","0.5");
+						.style("stroke-width","0.3");
 					break;
 				case 12:
-					_svg.append("line")
-                		.attr("y1",star_wars.sessions[i].members[j])
-                		.attr("x1",star_wars.sessions[i].start)
-						.attr("y2",star_wars.sessions[i].members[j])
-						.attr("x2",star_wars.sessions[i].end)
+					var d = line(arr_all[12]);
+				_svg.append("path")
+						.attr("d", d)
+						.attr("fill", "none")
 						.style("stroke","Purple")
-						.style("stroke-width","0.5");
+						.style("stroke-width","0.3");
 					break;
-				default:
-					_svg.append("line")
-                		.attr("y1",star_wars.sessions[i].members[j])
-                		.attr("x1",star_wars.sessions[i].start)
-						.attr("y2",star_wars.sessions[i].members[j])
-						.attr("x2",star_wars.sessions[i].end)
-						.style("stroke","steelblue")
-						.style("stroke-width","0.5");
+					case 13:
+					var d = line(arr_all[13]);
+				_svg.append("path")
+						.attr("d", d)
+						.attr("fill", "none")
+						.style("stroke","Red")
+						.style("stroke-width","0.3");
 					break;
+//				default:
+//					_svg.append("line")
+//                		.attr("y1",(star_wars.sessions[i].members[j])*(star_wars.sessions[i].location+1))
+//                		.attr("x1",star_wars.sessions[i].start)
+//						.attr("y2",(star_wars.sessions[i].members[j])*(star_wars.sessions[i].location+1))
+//						.attr("x2",star_wars.sessions[i].end)
+//						.style("stroke","steelblue")
+//						.style("stroke-width","0.5");
+//					break;
 					
   
 } 
